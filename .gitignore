@@ -1,0 +1,11 @@
+.DS_Store
+.idea
+*.pyc
+venv
+.vscode/
+settings_local.py
+db.sqlite3
+media
+static
+celerybeat-schedule.db
+venvv
