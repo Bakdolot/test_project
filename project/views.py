@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from django.utils.datastructures import MultiValueDictKeyError
 from rest_framework import generics, status
 from rest_framework.filters import SearchFilter
@@ -7,7 +8,8 @@ from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .paginations import ProjectPagination, NewsPagination, GalleryPagination
-from .models import Project, News, Gallery
+from .tasks import send_email
+from .models import Project, News, Gallery, Chronology, ProjectGallery, NewsGallery, GalleryFiles
 from .serializers import (
     FeedbackCreateSerializer,
     ProjectListSerializer,
@@ -15,16 +17,19 @@ from .serializers import (
     NewsListSerializer,
     NewsDetailSerializer,
     GalleryListSerializer,
-    GalleryDetailSerializer
+    GalleryDetailSerializer,
+    ChronologyDetailSerializer,
+    ProjectGallerySerializer,
+    NewsGallerySerializer,
+    GalleryFilesSerializer
 )
 
 
 class HomePageView(APIView):
-
     def get(self, request, format=None):
-        projects = Project.objects.all()[:9]
-        news = News.objects.all()[:9]
-        galleries = Gallery.objects.all()[:9]
+        projects = Project.objects.all()[:7]
+        news = News.objects.all()[:7]
+        galleries = Gallery.objects.all()[:7]
         project_serializer = ProjectListSerializer(projects, many=True)
         news_serializer = NewsListSerializer(news, many=True)
         gallery_serializer = GalleryListSerializer(galleries, many=True)
@@ -37,9 +42,20 @@ class HomePageView(APIView):
     def post(self, request, format=None):
         serializer = FeedbackCreateSerializer(data=request.data)
         if serializer.is_valid():
+            text = f'User: {request.POST["name"]}' \
+                   f'Phone: {request.POST["phone"]}' \
+                   f'Text: {request.POST["text"]}'
+            send_email.apply_async((text, ))
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AboutPage(generics.RetrieveAPIView):
+    queryset = Chronology.objects.all()
+    serializer_class = ChronologyDetailSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_fields = ['year']
 
 
 class ProjectListView(generics.ListAPIView):
@@ -58,35 +74,60 @@ class ProjectListView(generics.ListAPIView):
         return queryset
 
 
-class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = ProductDetailSerializer
-    queryset = Project.objects.all()
+class ProjectDetailView(APIView):
+    def get(self, request, pk):
+        project = get_object_or_404(Project, pk=pk)
+        project_ser = ProductDetailSerializer(project)
+        project_gallery = ProjectGallery.objects.filter(project=project)
+        gallery_ser = ProjectGallerySerializer(project_gallery, many=True)
+        return Response({
+            'project': project_ser.data,
+            'gallery': gallery_ser.data
+        })
 
 
 class NewsListView(generics.ListAPIView):
     serializer_class = NewsListSerializer
     queryset = News.objects.all()
     pagination_class = NewsPagination
+    filter_backends = [SearchFilter]
+    search_fields = ['title', 'short_description', 'body']
 
 
-class NewsDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = NewsDetailSerializer
-    queryset = News.objects.all()
+class NewsDetailView(APIView):
+    def get(self, request, pk):
+        object = get_object_or_404(News, pk=pk)
+        object_serializer = NewsDetailSerializer(object)
+        gallery = NewsGallery.objects.filter(news=object)
+        gallery_ser = NewsGallerySerializer(gallery, many=True)
+        try:
+            mob = self.request.query_params['mobile']
+            return Response({'news': object_serializer.data, 'gallery': gallery_ser.data})
+        except MultiValueDictKeyError:
+            news = News.objects.all()[:3]
+            news_serializer = NewsListSerializer(news, many=True)
+            return Response({
+                'object_serializer': object_serializer.data,
+                'news_serializer': news_serializer.data,
+                'gallery': gallery_ser.data
+            })
 
 
 class GalleryListView(generics.ListAPIView):
     serializer_class = GalleryListSerializer
     pagination_class = GalleryPagination
-
-    def get_queryset(self):
-        try:
-            video = self.request.query_params['video']
-            queryset = Gallery.objects.filter(is_photo=False)
-        except MultiValueDictKeyError:
-            queryset = Gallery.objects.filter(is_photo=True)
-        return queryset
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filter_fields = ['is_photo']
+    search_fields = ['title', 'body']
 
 
-class GalleryDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = GalleryDetailSerializer
-    queryset = Gallery.objects.all()
+class GalleryDetailView(APIView):
+    def get(self, request, pk):
+        gallery = get_object_or_404(Gallery, pk=pk)
+        gallery_ser = GalleryDetailSerializer(gallery)
+        files = GalleryFiles.objects.filter(gallery=gallery)
+        files_ser = GalleryFilesSerializer(files, many=True)
+        return Response({
+            'gallery': gallery_ser.data,
+            'files': files_ser.data
+        })
