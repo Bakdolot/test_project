@@ -3,11 +3,14 @@ from django.utils.safestring import mark_safe
 
 from .models import Feedback, Project, News, Gallery, Chronology, ProjectGallery, NewsGallery, GalleryFiles
 
+from imagekit.admin import AdminThumbnail
+
 
 class ProjectGalleryInline(admin.TabularInline):
     model = ProjectGallery
     extra = 1
-    readonly_fields = ['get_image']
+    readonly_fields = ['admin_thumbnail']
+    admin_thumbnail = AdminThumbnail(image_field='image', template='admin/thumbnail.html')
 
     def get_image(self, obj):
         return mark_safe(f'<img src={obj.image.url} width="100" height="110"')

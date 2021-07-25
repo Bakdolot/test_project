@@ -26,7 +26,7 @@ TYPE_CHOICES = [
 class Feedback(models.Model):
     name = models.CharField(max_length=30)
     phone = models.CharField(max_length=20)
-    massage = models.TextField()
+    message = models.TextField()
     created = models.DateField(auto_now_add=True)
 
     def __str__(self):
@@ -43,7 +43,7 @@ class Project(models.Model):
     body = RichTextUploadingField()
     start_date = models.DateField()
     completion_date = models.DateField()
-    file = models.FileField(upload_to='files/')
+    file = models.FileField(upload_to='files/', help_text='Upload your PDF file')
     region = models.CharField(choices=REGION_CHOICES, max_length=200)
     contribution = models.DecimalField(decimal_places=0, max_digits=19)
     project_url = models.CharField(max_length=100, blank=True)
@@ -100,7 +100,7 @@ class NewsGallery(models.Model):
 
 
 class Chronology(models.Model):
-    year = models.IntegerField()
+    year = models.IntegerField(unique=True)
     description = models.TextField(max_length=650)
 
     def __str__(self):

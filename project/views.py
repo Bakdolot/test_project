@@ -1,5 +1,4 @@
 from django.shortcuts import get_object_or_404
-from django.utils.datastructures import MultiValueDictKeyError
 from rest_framework import generics, status
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
@@ -42,20 +41,22 @@ class HomePageView(APIView):
     def post(self, request, format=None):
         serializer = FeedbackCreateSerializer(data=request.data)
         if serializer.is_valid():
-            text = f'User: {request.POST["name"]}' \
-                   f'Phone: {request.POST["phone"]}' \
-                   f'Text: {request.POST["text"]}'
+            text = f'User: {request.data["name"]}\n' \
+                   f'Phone: {request.data["phone"]}\n' \
+                   f'Text: {request.data["message"]}'
             send_email.apply_async((text, ))
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class AboutPage(generics.RetrieveAPIView):
-    queryset = Chronology.objects.all()
-    serializer_class = ChronologyDetailSerializer
-    filter_backends = [DjangoFilterBackend]
-    filter_fields = ['year']
+class AboutPage(APIView):
+    def get(self, request, *args, **kwargs):
+        objects = Chronology.objects.all()
+        if 'year' in self.request.query_params:
+            objects = objects.filter(year=self.request.query_params['year'])
+        serializer = ChronologyDetailSerializer(objects.first())
+        return Response(serializer.data, status.HTTP_200_OK)
 
 
 class ProjectListView(generics.ListAPIView):
@@ -66,17 +67,16 @@ class ProjectListView(generics.ListAPIView):
     pagination_class = ProjectPagination
 
     def get_queryset(self):
-        try:
-            re = self.request.query_params['old']
+        if 'old' in self.request.query_params:
             queryset = Project.objects.all().order_by('created')
-        except MultiValueDictKeyError:
+        else:
             queryset = Project.objects.all()
         return queryset
 
 
 class ProjectDetailView(APIView):
-    def get(self, request, pk):
-        project = get_object_or_404(Project, pk=pk)
+    def get(self, request, *args, **kwargs):
+        project = get_object_or_404(Project, pk=kwargs['pk'])
         project_ser = ProductDetailSerializer(project)
         project_gallery = ProjectGallery.objects.filter(project=project)
         gallery_ser = ProjectGallerySerializer(project_gallery, many=True)
@@ -95,15 +95,14 @@ class NewsListView(generics.ListAPIView):
 
 
 class NewsDetailView(APIView):
-    def get(self, request, pk):
-        object = get_object_or_404(News, pk=pk)
+    def get(self, request, *args, **kwargs):
+        object = get_object_or_404(News, pk=kwargs['pk'])
         object_serializer = NewsDetailSerializer(object)
         gallery = NewsGallery.objects.filter(news=object)
         gallery_ser = NewsGallerySerializer(gallery, many=True)
-        try:
-            mob = self.request.query_params['mobile']
+        if 'mobile' in self.request.query_params:
             return Response({'news': object_serializer.data, 'gallery': gallery_ser.data})
-        except MultiValueDictKeyError:
+        else:
             news = News.objects.all()[:3]
             news_serializer = NewsListSerializer(news, many=True)
             return Response({
@@ -114,6 +113,7 @@ class NewsDetailView(APIView):
 
 
 class GalleryListView(generics.ListAPIView):
+    queryset = Gallery.objects.all()
     serializer_class = GalleryListSerializer
     pagination_class = GalleryPagination
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -122,8 +122,8 @@ class GalleryListView(generics.ListAPIView):
 
 
 class GalleryDetailView(APIView):
-    def get(self, request, pk):
-        gallery = get_object_or_404(Gallery, pk=pk)
+    def get(self, request, *args, **kwargs):
+        gallery = get_object_or_404(Gallery, pk=kwargs['pk'])
         gallery_ser = GalleryDetailSerializer(gallery)
         files = GalleryFiles.objects.filter(gallery=gallery)
         files_ser = GalleryFilesSerializer(files, many=True)

@@ -1,0 +1,42 @@
+{% if thumbnail %}
+
+  <img src="{{ thumbnail.url }}" alt="thumbnail" height="220" width="200">
+
+{% else %}
+  <img src="" alt="" class="preview_image" height="220" width="200">
+
+  <script>
+      function handleFileSelect(event) {
+          let files = event.target.files; // FileList object
+          // Loop through the FileList and render image files as thumbnails
+          for (var i = 0, f; f = files[i]; i++) {
+              // Only process image files
+              if (!f.type.match('image.*')) continue;
+              // Init FileReader()
+              // See: https://developer.mozilla.org/en-US/docs/Web/API/FileReader
+              var reader = new FileReader();
+              // Closure to capture the file information
+              reader.onload = (function () {
+                  return function (e) {
+                      // Render background image
+
+
+                      Object.values(document.getElementsByClassName('preview_image')).map(el => el.attributes).map(el => `${el.src.value = e.target.result}`)
+
+
+                  };
+              })(f);
+              // Read in the image file as a data URL
+              reader.readAsDataURL(f);
+          }
+      }
+
+      // Change background after change file input
+      // id_image — is default ID for ImageField input named `image` (in Django Admin)
+
+   const ada = document.querySelectorAll('.field-image')
+  console.log(ada)
+      document.querySelector(`#id_projectgallery_set-${ada.length - 2}-image`).addEventListener('change', handleFileSelect, false);
+  </script>
+
+{% endif %}
