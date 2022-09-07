@@ -15,7 +15,7 @@ app.conf.task_always_eager = False
 app.conf.beat_schedule = {
     'everyday-task': {
         'task': 'project.tasks.check_finished',
-        'schedule': crontab(hour=0, minute=0),
+        'schedule': crontab(hour=1, minute=0),
     },
 }
 
